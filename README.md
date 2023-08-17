@@ -1,2 +1,2 @@
 # MTCDHT
-MTConnect adapter for DHT sensor
+MTConnect adapter for a DHT sensor
