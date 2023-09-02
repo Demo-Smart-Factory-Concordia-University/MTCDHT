@@ -91,17 +91,15 @@ bool connected = false;
 
 void sendTempSHDR(float temp)
 {
-  Serial.print("|Temp|");
-  Serial.println(temp);
-  String shdr = "|Temp|" + String(temp) + "\n";
+  String shdr = "|Temp|" + String(temp);
+  Serial.println(shdr);
   client.println(shdr);
 }
 
 void sendHumiSHDR(float humi)
 {
-  Serial.print("|Humi|");
-  Serial.println(humi);
-  String shdr = "|Humi|" + String(humi) + "\n";
+  String shdr = "|Humi|" + String(humi);
+  Serial.println(shdr);
   client.println(shdr);
 }
 
@@ -151,6 +149,8 @@ void loop() {
       if (client.connected()) {
         Serial.print("Connection recieved from ");
         Serial.println(client.remoteIP());
+        Serial.println("|avail|AVAILABLE");
+        client.println("|avail|AVAILABLE");
         connected = true;
       } else {    
         // the connection was not a TCP connection  
