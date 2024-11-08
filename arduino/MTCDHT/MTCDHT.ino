@@ -1,8 +1,8 @@
-// ---------------------------------------------------------------- 
-//                                                                  
-// MTConnect Adapter for ESP8266
+// ----------------------------------------------------------------
 //
-// (c) Rolf Wuthrich, 
+// MTConnect Adapter for ESP8266 / ESP32
+//
+// (c) Rolf Wuthrich,
 //     2023 Concordia University
 //
 // author:  Rolf Wuthrich
@@ -10,7 +10,7 @@
 //
 // This software is copyright under the BSD license
 //
-// --------------------------------------------------------------- 
+// ---------------------------------------------------------------
 
 // Demonstrates how to setup an MTConnect Adapter which
 // reads the temperature and temperature from a DHT11 Sensor
@@ -18,7 +18,7 @@
 // The adapter sends SHDR format to an MTConnect Agent which connected
 // to this adapter
 //
-// The adapter assumes the following configuration 
+// The adapter assumes the following configuration
 // in the MTConnect device model:
 //
 //   <DataItem category="SAMPLE" id="Temp" type="TEMPERATURE" units="CELCIUS"/>
@@ -29,7 +29,7 @@
 //
 // - ESP8266 Arduino board
 //   https://arduino-esp8266.readthedocs.io/en/3.0.2/
-// 
+//
 // Available via Sketch > Include Library > Manage Libraries:
 //
 // - DHT sensor library by Adafruit
@@ -37,7 +37,12 @@
 //   https://learn.adafruit.com/dht
 
 
+#ifdef ESP32
+#include <WiFi.h>
+#define LED_BUILTIN 2
+#elif defined(ESP8266)
 #include <ESP8266WiFi.h>
+#endif
 #include <DHT.h>
 #include "secrets.h"
 
@@ -60,16 +65,19 @@ const uint16_t port = 7878;
 // PONG (answer to '*PING' request from the MTConnect Agent)
 #define PONG "* PONG 60000"
 
+// Idle time: time in ms between consecutive readings of sensors
+#define IDLE_TIME 1000
+
 
 // -----------------------------------------------------
 // Configuration for DHT sensor
 
 // Pin for 1-wire connection of DHT11
-// Ref for pinout: 
+// Ref for pinout:
 // https://randomnerdtutorials.com/getting-started-with-esp8266-wifi-transceiver-review/
-#define DHTPIN 4              // This is D2
+#define DHTPIN 4              // This is D2 on the ESP8266 and IO4 on the ESP32
 
-// DHT sensor type
+// DHT sensor type either DHT11 or DHT22
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -105,7 +113,7 @@ void sendHumiSHDR(float humi)
 
 
 void setup() {
-  
+
   // Start the Serial Monitor
   Serial.begin(115200);
 
@@ -152,24 +160,35 @@ void loop() {
         Serial.println("|avail|AVAILABLE");
         client.println("|avail|AVAILABLE");
         connected = true;
-      } else {    
-        // the connection was not a TCP connection  
+        // collect sensor data
+        tempOld = dht.readTemperature();
+        humiOld = dht.readHumidity();
+        // sends SHDR data
+        sendTempSHDR(tempOld);
+        sendHumiSHDR(humiOld);
+      } else {
+        // the connection was not a TCP connection
         client.stop();  // close the connection:
       }
     }
-  } 
+  }
   else {
     if (client.connected()) {
-      
+
       // collect sensor data
       float temp = dht.readTemperature();
       float humi = dht.readHumidity();
-      
-      // Check if * PING request came
+
+      // Check entering commands
       String currentLine = "";
-      while (client.available()) { 
-        char c = client.read(); 
+      while (client.available()) {
+        char c = client.read();
         if (c == '\n') {
+          // Check if reboot request came
+          if (currentLine.startsWith("reboot")) {
+            ESP.restart();
+          }
+          // Check if * PING request came
           if (currentLine.startsWith("* PING")) {
             client.println(PONG);
           }
@@ -180,17 +199,18 @@ void loop() {
       }
 
       // sends SHDR data
-      if (temp!=tempOld) {
+      if (temp != tempOld) {
         sendTempSHDR(temp);
-        }
+      }
       tempOld = temp;
 
-      if (humi!=humiOld) {
+      if (humi != humiOld) {
         sendHumiSHDR(humi);
-        }
+      }
       humiOld = humi;
 
-      
+      delay(IDLE_TIME);
+
     }
     else {
       Serial.println("Client has disconnected ");
